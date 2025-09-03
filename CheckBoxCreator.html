@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Custom Category Checkbox App with Counter</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+    body { background-color: #f8f9fa; }
+    .category { margin-bottom: 20px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);}
+    .category h4 { display: flex; justify-content: space-between; align-items: center; }
+    .checkbox-item { display: flex; justify-content: space-between; align-items: center; margin: 5px 0; }
+    .btn-sm { margin-left: 5px; }
+    .counter { font-size: 0.9rem; color: #555; margin-top: 5px; }
+</style>
+</head>
+<body>
+<div class="container my-5">
+    <h2 class="text-center mb-4">📝 Custom Checkbox Creator</h2>
+
+    <div class="input-group mb-3">
+        <input type="text" id="newCategoryName" class="form-control" placeholder="Enter category name (e.g., Travel)">
+        <button class="btn btn-primary" onclick="addCategory()">Add Category</button>
+    </div>
+
+    <div class="input-group mb-3">
+        <select id="categorySelect" class="form-select">
+            <option value="">-- Select Category --</option>
+        </select>
+        <input type="text" id="checkboxText" class="form-control" placeholder="Enter checkbox label">
+        <button class="btn btn-success" onclick="addCheckbox()">Add Checkbox</button>
+    </div>
+
+    <div class="mb-3">
+        <button class="btn btn-warning" onclick="clearAllCategories()">Clear All Categories</button>
+        <button class="btn btn-info" onclick="printCheckboxes()">Print / Save PDF</button>
+    </div>
+
+    <div id="categoriesContainer"></div>
+</div>
+
+<script>
+let categories = [];
+
+// --- Data Persistence ---
+function saveData() {
+    localStorage.setItem('checkboxCategories', JSON.stringify(categories));
+}
+
+function loadData() {
+    const savedData = localStorage.getItem('checkboxCategories');
+    if (savedData) {
+        categories = JSON.parse(savedData);
+        renderAllCategories();
+        updateCategorySelect();
+    }
+}
+
+// --- UI Rendering ---
+function updateCategorySelect() {
+    const select = document.getElementById('categorySelect');
+    select.innerHTML = '<option value="">-- Select Category --</option>';
+    categories.forEach(cat => {
+        const option = document.createElement('option');
+        option.value = cat.name;
+        option.textContent = cat.name;
+        select.appendChild(option);
+    });
+}
+
+function renderAllCategories() {
+    const container = document.getElementById('categoriesContainer');
+    container.innerHTML = '';
+    categories.forEach(cat => {
+        const catElement = createCategoryElement(cat.name);
+        const list = catElement.querySelector('.checkbox-list');
+        cat.checkboxes.forEach(itemText => {
+            const checkboxItem = createCheckboxItem(itemText, cat.name);
+            list.appendChild(checkboxItem);
+        });
+        updateCounter(cat.name);
+        container.appendChild(catElement);
+    });
+}
+
+function createCategoryElement(catName) {
+    const div = document.createElement('div');
+    div.className = 'category';
+    div.id = `cat-${catName}`;
+
+    const title = document.createElement('h4');
+    title.textContent = catName;
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'btn btn-sm btn-warning';
+    clearBtn.textContent = 'Clear Checkboxes';
+    clearBtn.onclick = () => clearCategory(catName);
+
+    title.appendChild(clearBtn);
+
+    const checkboxList = document.createElement('div');
+    checkboxList.className = 'checkbox-list';
+    checkboxList.id = `list-${catName}`;
+
+    const counter = document.createElement('div');
+    counter.className = 'counter';
+    counter.id = `counter-${catName}`;
+    counter.textContent = 'Total: 0 | Checked: 0 | Unchecked: 0';
+
+    div.appendChild(title);
+    div.appendChild(checkboxList);
+    div.appendChild(counter);
+    return div;
+}
+
+function createCheckboxItem(text, catName) {
+    const div = document.createElement('div');
+    div.className = 'checkbox-item';
+
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.onchange = () => updateCounter(catName);
+
+    const label = document.createElement('span');
+    label.textContent = text;
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-sm btn-danger';
+    delBtn.textContent = 'Delete';
+    delBtn.onclick = () => {
+        const checkboxDiv = div;
+        const listDiv = checkboxDiv.parentElement;
+        const categoryId = catName;
+
+        const categoryIndex = categories.findIndex(c => c.name === categoryId);
+        if (categoryIndex !== -1) {
+            const itemIndex = categories[categoryIndex].checkboxes.indexOf(text);
+            if (itemIndex > -1) {
+                categories[categoryIndex].checkboxes.splice(itemIndex, 1);
+                saveData();
+            }
+        }
+        checkboxDiv.remove();
+        updateCounter(catName);
+    };
+
+    div.appendChild(input);
+    div.appendChild(label);
+    div.appendChild(delBtn);
+    return div;
+}
+
+// --- Counter ---
+function updateCounter(catName) {
+    const list = document.getElementById(`list-${catName}`);
+    const counter = document.getElementById(`counter-${catName}`);
+    if (!list || !counter) return;
+    const checkboxes = list.querySelectorAll('input[type=checkbox]');
+    const total = checkboxes.length;
+    const checked = list.querySelectorAll('input[type=checkbox]:checked').length;
+    const unchecked = total - checked;
+    counter.textContent = `Total: ${total} | Checked: ${checked} | Unchecked: ${unchecked}`;
+}
+
+// --- Action Functions ---
+function addCategory() {
+    const catInput = document.getElementById('newCategoryName');
+    const catName = catInput.value.trim();
+    if (!catName) return alert("Enter category name!");
+    if (!categories.find(c => c.name === catName)) {
+        const newCategory = { name: catName, checkboxes: [] };
+        categories.push(newCategory);
+        updateCategorySelect();
+        
+        const container = document.getElementById('categoriesContainer');
+        const newCatElement = createCategoryElement(catName);
+        container.appendChild(newCatElement);
+
+        catInput.value = '';
+        saveData();
+    } else {
+        alert("Category already exists!");
+    }
+}
+
+function addCheckbox() {
+    const catName = document.getElementById('categorySelect').value;
+    const text = document.getElementById('checkboxText').value.trim();
+    if (!catName) return alert("Select a category!");
+    if (!text) return alert("Enter checkbox label!");
+
+    const list = document.getElementById(`list-${catName}`);
+    if (!list) return alert("Category list not found!");
+
+    const checkboxItem = createCheckboxItem(text, catName);
+    list.appendChild(checkboxItem);
+
+    const category = categories.find(c => c.name === catName);
+    if (category) {
+        category.checkboxes.push(text);
+        saveData();
+    }
+
+    updateCounter(catName);
+    document.getElementById('checkboxText').value = '';
+}
+
+function clearCategory(catName) {
+    const confirmed = confirm(`Are you sure you want to clear all checkboxes from the category "${catName}"?`);
+    if (confirmed) {
+        const list = document.getElementById(`list-${catName}`);
+        list.innerHTML = '';
+        const category = categories.find(c => c.name === catName);
+        if (category) {
+            category.checkboxes = [];
+            saveData();
+        }
+        updateCounter(catName);
+    }
+}
+
+function clearAllCategories() {
+    const confirmed = confirm("Are you sure you want to clear ALL categories and checkboxes? This cannot be undone.");
+    if (confirmed) {
+        categories = [];
+        document.getElementById('categoriesContainer').innerHTML = '';
+        updateCategorySelect();
+        saveData();
+    }
+}
+
+function printCheckboxes() {
+    const printContent = document.getElementById('categoriesContainer').innerHTML;
+    const w = window.open();
+    w.document.write('<html><head><title>Print Checkboxes</title>');
+    w.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">');
+    w.document.write('<style>@media print { .btn-sm { display: none; } }</style>');
+    w.document.write('</head><body>');
+    w.document.write(printContent);
+    w.document.write('</body></html>');
+    w.document.close();
+    w.print();
+}
+
+// Load saved data
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+</body>
+</html>
